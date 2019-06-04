@@ -8,7 +8,7 @@ if [ -s "tmp" ]; then
   aa=`cat tmp | awk -F 'toNumbers' '{print $3}' | awk -F '"' '{print $2}'`
   bb=`cat tmp | awk -F 'toNumbers' '{print $4}' | awk -F '"' '{print $2}'`
   cc=`cat tmp | awk -F 'toNumbers' '{print $5}' | awk -F '"' '{print $2}'`
-echo $aa,$bb,$cc
+  #echo $aa,$bb,$cc
   cat aes.js>tmp
   echo "var a=toNumbers(\""$aa"\"),b=toNumbers(\""$bb"\"),c=toNumbers(\""$cc"\");print(toHex(slowAES.decrypt(c,2,a,b)));">>tmp
   L7FW=`js tmp`
@@ -19,5 +19,6 @@ echo $aa,$bb,$cc
   echo>>${precookiefile}
   echo -e 'www.hostloc.com\tFALSE\t/\tFALSE\t0\tL7FW\t'$L7FW>>${precookiefile}
 fi
+rm -f tmp
 
 curl -s -L -H "$UA" -b ${precookiefile} "https://www.hostloc.com/"
