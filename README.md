@@ -1,7 +1,7 @@
 # hostloccredit
-/*备用
+/*备用  
 jsshell:  
-a javascript shell, download from https://archive.mozilla.org/pub/firefox/nightly/latest-mozilla-central/ .
+a javascript shell, download from https://archive.mozilla.org/pub/firefox/nightly/latest-mozilla-central/ .  
 */
 
 用法1：bash hostloc.sh username password  
