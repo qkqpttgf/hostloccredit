@@ -4,6 +4,7 @@
 ##原 https://raw.githubusercontent.com/mixool/script/debian-9/hostloc.sh
 #
 #Auth：逸笙
+#wget https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/hostloc.sh
 #用法1：bash hostloc.sh username password
 #用法2：bash hostloc.sh accountfile
 #推荐写入crontab:
@@ -13,7 +14,7 @@
 #可多个，以空格分开
 we_no_id=""
 
-#元老号是否继续,1继续,0不签了
+#元老号继续,1继续,0不签了
 yuanlaogoon=0
 
 declare -A userpsw
@@ -22,6 +23,7 @@ declare -A aftcredit
 declare -A getcredit
 declare -A userlevel
 declare -A userUID
+declare -A cookies
 
 #get user info
 if [ $# -eq 2 ]; then
@@ -29,19 +31,24 @@ if [ $# -eq 2 ]; then
 fi
 if [ $# -eq 1 ]; then
   if [ -s "$1" ]; then
-    usrarry=(`cat $1 | awk '{print $1}'`)
-    pswarry=(`cat $1 | awk '{print $2}'`)
-    for((u=0;u<${#usrarry[*]};u++))
+    passfile=$1
+    while read line
     do
-      userpsw["${usrarry[$u]}"]="${pswarry[$u]}"
-    done
+      if [ g"${line}" != g"" -a g"${line:0:1}" != g"#" -a g"${line:0:1}" != g"@" ]; then
+        #echo ${line}
+        key1=${line%% *}
+        value1=${line#* }
+        #echo ${key1},${value1}
+        userpsw["${key1}"]="${value1}"
+      fi
+    done < "${passfile}"
   else
     echo 文件 $1 不存在
     exit 1
   fi
 fi
 
-#workdir
+# workdir
 workdir="/root/hostlog"
 [[ ! -d "${workdir}" ]] && mkdir ${workdir}
 logpath="/root/hostlog/"
@@ -55,14 +62,63 @@ function preconfig() {
   tmp=${workdir}/tmp
   curl -s -H "$UA" "https://www.hostloc.com/" | grep "slowAES">${tmp}
   if [ -s "${tmp}" ]; then
-    echo $(date "+%F %T %A") "论坛开启了js-cookie验证"
-    remark="论坛开启了js-cookie验证\n"
-    aa=`cat ${tmp} | awk -F 'a=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
-    bb=`cat ${tmp} | awk -F 'b=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
-    cc=`cat ${tmp} | awk -F 'c=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
-    #echo $aa,$bb,$cc
-    #提交abc的值给写好的无服务器函数计算
-    L7FW=`curl -s "https://service-27buax72-1258064400.ap-hongkong.apigateway.myqcloud.com/release/nodejstest1?aa="$aa"&bb="$bb"&cc="$cc`
+    echo -n $(date "+%F %T %A") "论坛开启了L7FW验证，"
+    remark="论坛开启了js-cookie验证，"
+    x86_64=`uname -a | grep "86_64"`
+    if [ g"${x86_64}" = g"" ]; then
+      echo "使用SCF计算。"
+      remark=${remark}"使用SCF计算。\n"
+      aa=`cat ${tmp} | awk -F 'a=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
+      bb=`cat ${tmp} | awk -F 'b=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
+      cc=`cat ${tmp} | awk -F 'c=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
+      #echo $aa,$bb,$cc
+      #提交abc的值给写好的无服务器函数计算
+      L7FW=`curl -s "https://service-27buax72-1258064400.ap-hongkong.apigateway.myqcloud.com/release/nodejstest1?aa="$aa"&bb="$bb"&cc="$cc`
+    else
+      echo "使用jsshell计算。"
+      remark=${remark}"使用jsshell计算。\n"
+      if [ ! -s "/usr/bin/js" ]; then
+        wget -qN "https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/js.tar.gz"
+        tar -xzf js.tar.gz
+        chmod +x js
+        mv js /usr/bin/
+        rm -f js.tar.gz
+      fi
+      if [ ! -s "/usr/bin/libnspr4.so" ]; then
+        wget -qN "https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/libnspr4.so"
+        chmod +x libnspr4.so
+        mv libnspr4.so /usr/bin/
+      fi
+      if [ ! -s "/usr/bin/libplc4.so" ]; then
+        wget -qN "https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/libplc4.so"
+        chmod +x libplc4.so
+        mv libplc4.so /usr/bin/
+      fi
+      if [ ! -s "/usr/bin/libplds4.so" ]; then
+        wget -qN "https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/libplds4.so"
+        chmod +x libplds4.so
+        mv libplds4.so /usr/bin/
+      fi
+      funstr=`cat ${tmp} | awk -F '<script>' '{print $2}' | awk -F ';location.href' '{print $1}'`
+      funstr=${funstr/document.cookie=/print(}");"
+      aesjs=`cat ${tmp} | awk -F 'src=' '{print $2}' | awk -F '"' '{print $2}'`
+      curl -s -H "$UA" --referer "https://www.hostloc.com/" "https://www.hostloc.com"$aesjs --output jstmp
+      echo >>jstmp
+      echo ${funstr}>>jstmp
+      cookiestr=`js jstmp | awk -F ';' '{print $1,$2,$3,$4}'`
+      for c in ${cookiestr[@]}
+      do
+        key1=${c%%=*}
+        value1=${c#*=}
+        cookies[$key1]=$value1
+      done
+      for c in ${!cookies[@]}
+      do
+        [ g"$c" = g"path" ] || key=$c
+      done
+      L7FW=${cookies["L7FW"]}
+      rm -f jstmp
+    fi
     #生成precookie文件
     echo '# Netscape HTTP Cookie File'>${precookiefile}
     echo '# http://curl.haxx.se/docs/http-cookies.html'>>${precookiefile}
@@ -121,6 +177,7 @@ function passyuanlao() {
   if [ "${userlevel[$user1]}" = "论坛元老" ]; then
     echo "$(date "+%F %T %A")" "论坛元老 不签到"
     remark=${remark}"UID:${userUID[$user1]},\t${user1},\t${userlevel[$user1]},\t不签\n"
+    sed -i "s/${user1} ${password}/\@${user1} ${password}/" ${passfile}
     logout
     continue
   fi
@@ -166,7 +223,7 @@ function view() {
     curl -s -H "$UA" -b ${cookiefile} "https://www.hostloc.com/space-uid-${viewuid[$a]}.html" | grep -o "最近访客" >/dev/null && p=1 || echo " banlist"
     if [ $p -eq 1 ]; then
       ((a++))
-      echo -e "\t,ok\t$a"
+      echo -e ",\tok\t$a"
     fi
     [[ $a -eq 10 ]] && break
   done
