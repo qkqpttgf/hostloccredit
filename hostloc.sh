@@ -7,7 +7,7 @@
 #wget https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/hostloc.sh
 #用法1：bash hostloc.sh username password
 #用法2：bash hostloc.sh accountfile
-#推荐写入crontab:
+#推荐写入crontab,最后会清理1个月前log:
 #43 4 * * * bash /root/hostloc.sh /root/hostlocpsw >/root/hostlog/$(date +%Y%m%d)-log.txt
 
 #微信开发者服务，不用就留空，关注wxpusher获得ID
@@ -17,6 +17,16 @@ we_no_id=""
 #元老号继续,1继续,0不签了
 yuanlaogoon=0
 
+# workdir
+workdir="/root/hostlog"
+[[ ! -d "${workdir}" ]] && mkdir ${workdir}
+logpath="/root/hostlog/"
+precookiefile="${workdir}/precookiefile"
+
+UA="Mozilla/5.0+(Windows+NT+6.2;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/74.0.3729.131+Safari/537.36"
+
+delaytime=15
+
 declare -A userpsw
 declare -A precredit
 declare -A aftcredit
@@ -24,6 +34,7 @@ declare -A getcredit
 declare -A userlevel
 declare -A userUID
 declare -A cookies
+declare -A strings
 
 #get user info
 if [ $# -eq 2 ]; then
@@ -42,32 +53,35 @@ if [ $# -eq 1 ]; then
         userpsw["${key1}"]="${value1}"
       fi
     done < "${passfile}"
+    #usrarry=(`cat $1 | awk '{print $1}'`)
+    #pswarry=(`cat $1 | awk '{print $2}'`)
+    #for((u=0;u<${#usrarry[*]};u++))
+    #do
+    #  userpsw["${usrarry[$u]}"]="${pswarry[$u]}"
+    #done
   else
     echo 文件 $1 不存在
     exit 1
   fi
 fi
 
-# workdir
-workdir="/root/hostlog"
-[[ ! -d "${workdir}" ]] && mkdir ${workdir}
-logpath="/root/hostlog/"
-precookiefile="${workdir}/precookiefile"
-
-UA="Mozilla/5.0+(Windows+NT+6.2;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/74.0.3729.131+Safari/537.36"
-
-delaytime=15
+#strings
+strings[0]="论坛开启了L7FW验证，"
+strings[1]="使用SCF计算。"
+strings[2]="使用jsshell计算。"
+strings[3]="HostLoc访问空间"
+strings[4]="论坛元老"
 
 function preconfig() {
   tmp=${workdir}/tmp
   curl -s -H "$UA" "https://www.hostloc.com/" | grep "slowAES">${tmp}
   if [ -s "${tmp}" ]; then
-    echo -n $(date "+%F %T %A") "论坛开启了L7FW验证，"
-    remark="论坛开启了js-cookie验证，"
+    echo -n $(date "+%F %T %A") "${strings[0]}"
+    remark="${strings[0]}"
     x86_64=`uname -a | grep "86_64"`
     if [ g"${x86_64}" = g"" ]; then
-      echo "使用SCF计算。"
-      remark=${remark}"使用SCF计算。\n"
+      echo "${strings[1]}"
+      remark=${remark}"${strings[1]}\n"
       aa=`cat ${tmp} | awk -F 'a=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
       bb=`cat ${tmp} | awk -F 'b=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
       cc=`cat ${tmp} | awk -F 'c=toNumbers' '{print $2}' | awk -F '"' '{print $2}'`
@@ -75,8 +89,8 @@ function preconfig() {
       #提交abc的值给写好的无服务器函数计算
       L7FW=`curl -s "https://service-27buax72-1258064400.ap-hongkong.apigateway.myqcloud.com/release/nodejstest1?aa="$aa"&bb="$bb"&cc="$cc`
     else
-      echo "使用jsshell计算。"
-      remark=${remark}"使用jsshell计算。\n"
+      echo "${strings[2]}"
+      remark=${remark}"${strings[2]}\n"
       if [ ! -s "/usr/bin/js" ]; then
         wget -qN "https://raw.githubusercontent.com/qkqpttgf/hostloccredit/master/js.tar.gz"
         tar -xzf js.tar.gz
@@ -174,8 +188,8 @@ function logout() {
 }
 
 function passyuanlao() {
-  if [ "${userlevel[$user1]}" = "论坛元老" ]; then
-    echo "$(date "+%F %T %A")" "论坛元老 不签到"
+  if [ "${userlevel[$user1]}" = "${strings[4]}" ]; then
+    echo "$(date "+%F %T %A")" "${strings[4]} 不签"
     remark=${remark}"UID:${userUID[$user1]},\t${user1},\t${userlevel[$user1]},\t不签\n"
     sed -i "s/${user1} ${password}/\@${user1} ${password}/" ${passfile}
     logout
@@ -294,7 +308,7 @@ function main() {
   echo "$(date "+%F %T %A")" "${stat1}"
   remark=${remark:0:-2}
   echo -e "${remark}"
-  [ -n "${we_no_id}" ] && noticetowechat 'HostLoc访问空间' "${lnum}" "${stat1}" "${remark}"
+  [ -n "${we_no_id}" ] && noticetowechat "${strings[3]}" "${lnum}" "${stat1}" "${remark}"
 
   [ -s "${precookiefile}" ] && rm -f ${precookiefile}
   dellog ${logpath}
